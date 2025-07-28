@@ -1,49 +1,371 @@
-const db = require('../models/transaction.mdel');
-const Transaction = db.Transaction;
+const { Transaction, Wallet, User, sequelize, Op } = require("../models")
+const { v4: uuidv4 } = require("uuid")
 
 class TransactionController {
-  async listByUser(req, res) {
+  // Obtenir les transactions d'un utilisateur
+  async getUserTransactions(req, res) {
     try {
-      const { userId } = req.params;
-      const transactions = await Transaction.findAll({
-        where: { userId },
-        order: [['createdAt', 'DESC']],
-      });
-      res.json(transactions);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+      // console.log(req)
+      // process.exit()
+      const userId = req.userId || req.user.userId
+      const { page = 1, limit = 20, type, status, currency } = req.query
+
+      const whereClause = { userId }
+      //possibilité de trier en fonction des types ou de status et currency
+      if (type) whereClause.type = type
+      if (status) whereClause.status = status
+      if (currency) whereClause.currency = currency.toUpperCase()
+
+      const offset = (page - 1) * limit
+      const transactions = await Transaction.findAndCountAll({
+        where: whereClause,
+        order: [["createdAt", "DESC"]],
+        limit: Number.parseInt(limit),
+        offset: Number.parseInt(offset),
+        include: [
+          {
+            model: User,
+            as: "sender",
+            attributes: ["id", "FirstName", "email"],
+          },
+          {
+            model: User,
+            as: "receiver",
+            attributes: ["id", "FirstName", "email"],
+          },
+        ],
+      })
+
+      res.json({
+        transactions: transactions.rows,
+        pagination: {
+          currentPage: Number.parseInt(page),
+          totalPages: Math.ceil(transactions.count / limit),
+          totalItems: transactions.count,
+          itemsPerPage: Number.parseInt(limit),
+        },
+      })
+    } catch (err) {
+      res.status(500).json({ error: err.message })
     }
   }
 
-  async create(req, res) {
+  // Obtenir une transaction par ID
+  async getTransaction(req, res) {
     try {
-      const { userId, type, amount, currency, description, senderId, receiverId } = req.body;
-      const transaction = await Transaction.create({
-        userId,
-        type,
-        amount,
-        currency,
-        description,
-        senderId,
-        receiverId,
-        status: 'completed',
-      });
-      res.status(201).json(transaction);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+      const { id } = req.params
+      const userId = req.userId
+
+      const transaction = await Transaction.findOne({
+        where: {
+          id,
+          userId,
+        },
+        include: [
+          {
+            model: User,
+            as: "sender",
+            attributes: ["id", "FirstName", "email"],
+          },
+          {
+            model: User,
+            as: "receiver",
+            attributes: ["id", "FirstName", "email"],
+          },
+        ],
+      })
+
+      if (!transaction) {
+        return res.status(404).json({
+          message: "Transaction introuvable",
+        })
+      }
+
+      res.json(transaction)
+    } catch (err) {
+      res.status(500).json({ error: err.message })
     }
   }
 
-  async getAll(req, res) {
+  // Créer un transfert interne
+  async createTransfer(req, res) {
     try {
-      const transactions = await Transaction.findAll({
-        order: [['createdAt', 'DESC']],
-      });
-      res.json(transactions);
-    } catch (error) {
-      res.status(500).json({ error: error.message });
+      // console.log(receiver)
+      const { phone, amount, currency, description } = req.body
+      const senderId = req.userId 
+
+      // Trouver le destinataire
+      const receiver = await User.findOne({ where: { phone:phone } })
+      if (!receiver) {
+        return res.status(404).json({
+          message: "Aucun utilisateur trouvé avec cette adresse email",
+        })
+      }
+      if (receiver.id === senderId) {
+        return res.status(400).json({
+          message: "Vous ne pouvez pas vous transférer de l'argent à vous-même",
+        })
+      }
+
+      // Vérifier le portefeuille de l'expéditeur
+      const senderWallet = await Wallet.findOne({
+        where: {
+          userId: senderId,
+          currency: currency.toUpperCase(),
+        },
+      })
+
+      if (!senderWallet) {
+        return res.status(404).json({
+          message: `Aucun portefeuille ${currency} trouvé`,
+        })
+      }
+
+      if (Number.parseFloat(senderWallet.balance) < Number.parseFloat(amount)) {
+        return res.status(400).json({
+          message: "Fonds insuffisants dans votre portefeuille",
+        })
+      }
+
+      // Obtenir ou créer le portefeuille du destinataire
+      let receiverWallet = await Wallet.findOne({
+        where: {
+          userId: receiver.id,
+          currency: currency.toUpperCase(),
+        },
+      })
+
+      if (!receiverWallet) {
+        receiverWallet = await Wallet.create({
+          userId: receiver.id,
+          currency: currency.toUpperCase(),
+          balance: 0.0,
+        })
+      }
+
+      // Calculer les frais (exemple: 1% de frais de transfert)
+      const feeRate = 0.01
+      const fees = Number.parseFloat(amount) * feeRate
+      const netAmount = Number.parseFloat(amount) - fees
+
+      const reference = `TXN_${uuidv4().substring(0, 8).toUpperCase()}`
+
+      // Commencer la transaction de base de données
+      const dbTransaction = await sequelize.transaction()
+
+      try {
+        // Mettre à jour le portefeuille de l'expéditeur
+        await senderWallet.update(
+          {
+            balance: Number.parseFloat(senderWallet.balance) - Number.parseFloat(amount),
+          },
+          { transaction: dbTransaction },
+        )
+
+        // Mettre à jour le portefeuille du destinataire
+        await receiverWallet.update(
+          {
+            balance: Number.parseFloat(receiverWallet.balance) + netAmount,
+          },
+          { transaction: dbTransaction },
+        )
+        // Créer la transaction de l'expéditeur
+        const senderTransaction = await Transaction.create(
+          {
+            userId: senderId,
+            walletId: senderWallet.id,
+            type: "transfer",
+            amount: -Number.parseFloat(amount),
+            currency: currency.toUpperCase(),
+            status: "completed",
+            // description: description || `Transfert vers ${receiver.name}`,
+            reference,
+            senderId,
+            receiverId: receiver.id,
+            fees,
+            processedAt: new Date(),
+          },
+          { transaction: dbTransaction },
+        )
+        
+        // Créer la transaction du destinataire
+        await Transaction.create(
+          {
+            userId: receiver.id,
+            walletId: receiverWallet.id,
+            type: "transfer",
+            amount: netAmount,
+            currency: currency.toUpperCase(),
+            status: "completed",
+            description: description || `Transfert de ${req.userDetails?.name || "Utilisateur"}`,
+            reference,
+            senderId,
+            receiverId: receiver.id,
+            fees: 0,
+            processedAt: new Date(),
+          },
+          { transaction: dbTransaction },
+        )
+        // console.log(reference)
+        // process.exit()
+        
+        // await dbTransaction.commit()
+
+        res.json({
+          message: "Transfert effectué avec succès",
+          transaction: {
+            id: senderTransaction.id,
+            reference,
+            amount: Number.parseFloat(amount),
+            currency: currency.toUpperCase(),
+            fees,
+            netAmount,
+            receiver: {
+              name: receiver.name,
+              email: receiver.email,
+            },
+          },
+        })
+      } catch (error) {
+        await dbTransaction.rollback()
+        throw error
+      }
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  }
+
+  // Obtenir les statistiques des transactions
+  async getTransactionStats(req, res) {
+    try {
+      const userId = req.user.userId
+      const { period = "30d" } = req.query
+
+      let dateFilter = {}
+      const now = new Date()
+
+      switch (period) {
+        case "7d":
+          dateFilter = {
+            createdAt: {
+              [Op.gte]: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+            },
+          }
+          break
+        case "30d":
+          dateFilter = {
+            createdAt: {
+              [Op.gte]: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
+            },
+          }
+          break
+        case "90d":
+          dateFilter = {
+            createdAt: {
+              [Op.gte]: new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000),
+            },
+          }
+          break
+      }
+
+      const stats = await Transaction.findAll({
+        where: {
+          userId,
+          ...dateFilter,
+        },
+        attributes: [
+          "type",
+          "status",
+          [sequelize.fn("COUNT", sequelize.col("id")), "count"],
+          [sequelize.fn("SUM", sequelize.fn("ABS", sequelize.col("amount"))), "totalAmount"],
+        ],
+        group: ["type", "status"],
+      })
+
+      const summary = {
+        totalTransactions: 0,
+        totalVolume: 0,
+        byType: {},
+        byStatus: {},
+      }
+
+      stats.forEach((stat) => {
+        const count = Number.parseInt(stat.dataValues.count)
+        const amount = Number.parseFloat(stat.dataValues.totalAmount) || 0
+
+        summary.totalTransactions += count
+        summary.totalVolume += Math.abs(amount)
+
+        if (!summary.byType[stat.type]) {
+          summary.byType[stat.type] = { count: 0, amount: 0 }
+        }
+        summary.byType[stat.type].count += count
+        summary.byType[stat.type].amount += Math.abs(amount)
+
+        if (!summary.byStatus[stat.status]) {
+          summary.byStatus[stat.status] = { count: 0, amount: 0 }
+        }
+        summary.byStatus[stat.status].count += count
+        summary.byStatus[stat.status].amount += Math.abs(amount)
+      })
+
+      res.json(summary)
+    } catch (err) {
+      res.status(500).json({ error: err.message })
     }
   }
 }
 
-module.exports = new TransactionController();
+module.exports = new TransactionController()
+
+
+
+// const db = require('../models/transaction.mdel');
+// const Transaction = db.Transaction;
+
+// class TransactionController {
+//   async listByUser(req, res) {
+//     try {
+//       const { userId } = req.params;
+//       const transactions = await Transaction.findAll({
+//         where: { userId },
+//         order: [['createdAt', 'DESC']],
+//       });
+//       res.json(transactions);
+//     } catch (error) {
+//       res.status(500).json({ error: error.message });
+//     }
+//   }
+
+//   async create(req, res) {
+//     try {
+//       const { userId, type, amount, currency, description, senderId, receiverId } = req.body;
+//       const transaction = await Transaction.create({
+//         userId,
+//         type,
+//         amount,
+//         currency,
+//         description,
+//         senderId,
+//         receiverId,
+//         status: 'completed',
+//       });
+//       res.status(201).json(transaction);
+//     } catch (error) {
+//       res.status(500).json({ error: error.message });
+//     }
+//   }
+
+//   async getAll(req, res) {
+//     try {
+//       const transactions = await Transaction.findAll({
+//         order: [['createdAt', 'DESC']],
+//       });
+//       res.json(transactions);
+//     } catch (error) {
+//       res.status(500).json({ error: error.message });
+//     }
+//   }
+// }
+
+// module.exports = new TransactionController();

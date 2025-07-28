@@ -1,8 +1,6 @@
 const bcrypt = require('bcryptjs');
 const JWT = require('jsonwebtoken');
 const {User} = require('../models');
-// const config = require('../config/database');
-// const { where } = require('sequelize');
 
 class UserAuthController {
     // une methode pour l'autantification d'un utilisateur
@@ -10,7 +8,6 @@ class UserAuthController {
         const {email,password} = req.body ;
         try {
             const user = await User.findOne({where:{email}});
-            console.log(user)
             if (!user) {
                 return res.status(400).json({message:'not found'});
             }
@@ -27,10 +24,10 @@ class UserAuthController {
             /**
              * creation d'un tocken d'authentification
             */
-           const token = JWT.sign(
+            const token = JWT.sign(
                { userId: user.id },
                process.env.JWT_SECRET,
-               { expiresIn: '1h' }
+               { expiresIn: '1d' }
             );
            res.status(200).json({message:'connexion reussi',token});
 
@@ -40,5 +37,4 @@ class UserAuthController {
     }
 
 }
-
 module.exports = new UserAuthController();
