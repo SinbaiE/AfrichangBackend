@@ -9,6 +9,10 @@ module.exports = (sequelize, DataTypes) => {
       type: DataTypes.INTEGER,
       allowNull: false,
     },
+    walletId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
     amount: {
       type: DataTypes.DECIMAL(15, 2),
       allowNull: false,
@@ -57,7 +61,8 @@ module.exports = (sequelize, DataTypes) => {
   });
 
   Withdrawal.associate = (models) => {
-     Withdrawal.belongsTo(models.User, { foreignKey: 'userId' });
+    Withdrawal.belongsTo(models.User, { foreignKey: 'userId' });
+    Withdrawal.belongsTo(models.wallet, { foreignKey: 'walletId' });
   };
 
   return Withdrawal;

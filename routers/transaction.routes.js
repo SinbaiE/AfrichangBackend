@@ -18,7 +18,7 @@ router.get("/transactions",auth,  TransactionController.getUserTransactions)
 router.get("/transactions/:id",auth,  TransactionController.getTransaction)
 router.get("/transactions/single/:id",auth,  TransactionController.getTransaction)
 router.post("/transactions/transfer",auth,  TransactionController.createTransfer)
-router.get("/transactions/stats",auth,  TransactionController.getTransactionStats)
+router.get("/transactions/statistique/stats",auth,  TransactionController.getTransactionStats)
 
 module.exports = router
 

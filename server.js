@@ -15,6 +15,7 @@ const exchangeorderRouter = require('./routers/exchangeOrder.routes');
 const exchangeraterRouter = require('./routers/exchangeRate.routes');
 const transactionRouter = require('./routers/transaction.routes');
 const withdrawelRouter = require('./routers/withdrawal.routes');
+const ProfileRouter = require('./routers/profile.routes')
   
 const app = express();
 app.use(cors());
@@ -33,6 +34,8 @@ app.use('/api',exchangeorderRouter);
 app.use('/api',exchangeraterRouter);  
 app.use('/api',transactionRouter);
 app.use('/api',withdrawelRouter);
+app.use('/api',ProfileRouter);
+
 
 // Test connexion à la base de données
 // Connexion à la DB
