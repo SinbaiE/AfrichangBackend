@@ -21,8 +21,8 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
     },
     status: {
-      type: DataTypes.ENUM('open', 'completed', 'cancelled'),
-      defaultValue: 'open',
+      type: DataTypes.ENUM('completed', 'failed'),
+      defaultValue: 'completed',
     },
     matchedWith: {
       type: DataTypes.INTEGER,
