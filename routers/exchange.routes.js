@@ -14,4 +14,7 @@ router.get('/exchange-offers/user/:userId', ExchangeOfferController.listByUser);
 // Annuler une offre
 router.delete('/exchange-offers/:id', ExchangeOfferController.cancel);
 
+// Accepter une offre
+router.post('/exchange-offers/:id/accept', ExchangeOfferController.accept);
+
 module.exports = router;
