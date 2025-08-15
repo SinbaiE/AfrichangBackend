@@ -8,10 +8,10 @@ module.exports = (sequelize, DataTypes) => {
       },
     },
     LastName: {
-      type: DataTypes.STRING(100),
+      type: DataTypes.STRING(100),                                                                               
       allowNull: false,
       validate: {
-        len: [2, 100],
+        len: [2, 100],           
       },
     },
     email: {

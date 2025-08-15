@@ -53,9 +53,7 @@ module.exports = (sequelize, DataTypes) => {
   Wallet.hasMany(models.Transaction, { foreignKey: 'walletId' });
   // Un portefeuille peut avoir plusieurs dépôts
   Wallet.hasMany(models.Deposit, { foreignKey: 'walletId' });
-  // Un dépôt appartient à un portefeuille (ceci doit être dans le modèle Deposit.js)
-  // Deposit.belongsTo(models.Wallet, { foreignKey: 'walletId' });
-  // Un portefeuille peut avoir plusieurs retraits
+  
   Wallet.hasMany(models.Withdrawal, { foreignKey: 'walletId' });
 };
 
@@ -64,27 +62,3 @@ module.exports = (sequelize, DataTypes) => {
 }
 
 
-
-// module.exports = (sequelize, DataTypes) => {
-//   const Wallet = sequelize.define('Wallet', {
-//     userId: {
-//       type: DataTypes.INTEGER,
-//       allowNull: true,
-//     },
-//     currency: {
-//       type: DataTypes.STRING,
-//       allowNull: false,
-//     },
-//     balance: {
-//       type: DataTypes.DECIMAL(20, 2),
-//       allowNull: false,
-//       defaultValue: 0.00,
-//     },
-//   });
-
-//   Wallet.associate = (models) => {
-//     Wallet.belongsTo(models.User, { foreignKey: 'userId', onDelete: 'CASCADE' });
-//   };
-
-//   return Wallet;
-// };

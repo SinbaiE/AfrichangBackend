@@ -1,7 +1,7 @@
 const express = require("express")
 const router = express.Router()
 const DepositController = require("../controllers/DepositController")
-const auth = require("../midalwaire/auth.middalwaire")
+const {auth} = require("../midalwaire/auth.middalwaire")
 
 // Toutes les routes nécessitent une authentification
 router.use(auth)

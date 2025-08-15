@@ -11,11 +11,12 @@ const walletRouters = require('./routers/wallet.routes');
 const auditRouters = require('./routers/audit.routes');
 const depositRouters = require('./routers/deposit.routes');
 const exchangeRouters = require('./routers/exchange.routes');
-const exchangeorderRouter = require('./routers/exchangeOrder.routes');
+// const exchangeorderRouter = require('./routers/exchangeOrder.routes');
 const exchangeraterRouter = require('./routers/exchangeRate.routes');
 const transactionRouter = require('./routers/transaction.routes');
 const withdrawelRouter = require('./routers/withdrawal.routes');
 const ProfileRouter = require('./routers/profile.routes')
+const kycRoutes = require('./routers/kycroutes');
   
 const app = express();
 app.use(cors());
@@ -30,11 +31,13 @@ app.use('/api',walletRouters);
 app.use('/api',auditRouters);
 app.use('/api',depositRouters);
 app.use('/api',exchangeRouters);
-app.use('/api',exchangeorderRouter);
+// app.use('/api',exchangeorderRouter);
 app.use('/api',exchangeraterRouter);  
 app.use('/api',transactionRouter);
 app.use('/api',withdrawelRouter);
 app.use('/api',ProfileRouter);
+app.use('/api', kycRoutes);
+
 
 
 // Test connexion à la base de données

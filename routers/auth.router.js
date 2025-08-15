@@ -2,6 +2,7 @@ const express = require('express');
 const loginController = require('../controllers/auth.controller');
 
 const authRouter = express.Router();
+console.log('lavie de kkskkdn')
 authRouter.post('/auth',loginController.login);
 
 module.exports = authRouter;

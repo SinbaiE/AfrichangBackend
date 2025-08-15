@@ -1,6 +1,6 @@
 const express = require("express")
 const {body,param} = require('express-validator')
-const auth = require("../midalwaire/auth.middalwaire")
+const {auth} = require("../midalwaire/auth.middalwaire")
 const ProfileController = require("../controllers/ProfileController")
 // const multer = require("multer")
 

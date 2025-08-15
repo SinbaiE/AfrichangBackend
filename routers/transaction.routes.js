@@ -1,7 +1,7 @@
 const express = require("express")
 const {body,param} = require('express-validator')
 const TransactionController = require("../controllers/TransactionController")
-const auth = require("../midalwaire/auth.middalwaire")
+const {auth} = require("../midalwaire/auth.middalwaire")
 
 const router = express.Router()
 
